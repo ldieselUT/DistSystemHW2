@@ -39,7 +39,7 @@ class DragWidget(QtGui.QFrame):
 	def dragMoveEvent(self, event):
 		if event.mimeData().hasFormat("application/x-dnditemdata"):
 			if event.source() == self:
-				event.setDropAction(QtCore.QtMoveAction)
+				event.setDropAction(QtCore.Qt.CopyAction)
 				event.accept()
 			else:
 				event.acceptProposedAction()
@@ -47,47 +47,57 @@ class DragWidget(QtGui.QFrame):
 			event.ignore()
 
 	def dropEvent(self, event):
-		pass
+		if event.mimeData().hasFormat("application/x-dnditemdata"):
+			itemData = event.mimeData().data("application/x-dnditemdata")
+			dataStream = QtCore.QDataStream(itemData, QtCore.QIODevice.ReadOnly)
+
+			pixmap = QtGui.QPixmap()
+			offset = QtCore.QPoint()
+			dataStream >> pixmap >> offset
+
+			newIcon = QtGui.QLabel(self)
+			newIcon.setPixmap(pixmap)
+			newIcon.move(event.pos() - offset)
+			newIcon.show()
+			newIcon.setAttribute(QtCore.Qt.WA_DeleteOnClose)
+
+			if event.source() == self:
+				event.setDropAction(QtCore.Qt.MoveAction)
+				event.accept()
+			else:
+				event.acceptProposedAction()
+		else:
+			event.ignore()
 
 	def mousePressEvent(self, event):
-		child = QtGui.QLabel.childAt(event.pos())
+		child = self.childAt(event.pos())
 		if not child:
 			return
 
 		pixmap = child.pixmap()
 
-		itemData = QtGui.QByteArray()
-		dataStream = QtGui.QDataStream(itemData, QtCore.QIODevice.WriteOnly)
+		itemData = QtCore.QByteArray()
+		dataStream = QtCore.QDataStream(itemData, QtCore.QIODevice.WriteOnly)
 
-		dataStream << pixmap << QPoint(event->pos() - child->pos());
+		dataStream << pixmap << (event.pos() - child.pos())
 
-		QMimeData * mimeData = new
-		QMimeData;
-		mimeData->setData("application/x-dnditemdata", itemData);
+		mimeData = QtCore.QMimeData()
+		mimeData.setData("application/x-dnditemdata", itemData)
 
-		QDrag * drag = new
-		QDrag(this);
-		drag->setMimeData(mimeData);
-		drag->setPixmap(pixmap);
-		drag->setHotSpot(event->pos() - child->pos());
+		drag = QtGui.QDrag(self)
+		drag.setMimeData(mimeData)
+		drag.setPixmap(pixmap)
+		drag.setHotSpot(event.pos() - child.pos())
 
-		QPixmap
-		tempPixmap = pixmap;
-		QPainter
-		painter;
-		painter.begin( & tempPixmap);
-		painter.fillRect(pixmap.rect(), QColor(127, 127, 127, 127));
-		painter.end();
 
-		child->setPixmap(tempPixmap);
+		result = drag.exec_(QtCore.Qt.CopyAction | QtCore.Qt.MoveAction)
+		print result, QtCore.Qt.MoveAction
+		if result == QtCore.Qt.MoveAction:
+			child.close()
+		else:
+			child.setPixmap(pixmap)
+			child.show()
 
-		if (drag-> exec (Qt::
-			CopyAction | Qt::MoveAction, Qt::CopyAction) == Qt::MoveAction) {
-			child->close();
-		} else {
-			child->show();
-		child->setPixmap(pixmap);
-		}
 
 
 def main():
