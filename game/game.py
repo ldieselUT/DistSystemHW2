@@ -1,28 +1,44 @@
 import operator
 
-initField = [('Aircraft Carrier','a1 v'),
-             ('Battleship','a3 v'),
-             ('Cruiser','a5 v'),
-             ('Submarine','a7 v'),
-             ('Destroyer','a9 v')]
+
 class Game:
 	def __init__(self, battlefield_size, owner):
+		''' Init Game before game can begin all players need to fill out their playfields
+		:param battlefield_size: number of playfields the game has
+		:type battlefield_size: int
+		:param owner: name of owner of the game
+		:type owner: str
+		'''
 		self.battlefield_size = battlefield_size
-		self.owner = owner
+		self.owner = Player(owner)
 		self.players = dict()
-		self.players[self.owner] = Battlefield()
+		self.players[self.owner.name] = self.owner
 		self.winner = None
-		return
 
 	def addPlayer(self, player):
+		''' adds player to dictionary of players in the game, players limited to size of battlefield
+		:param player: name of player
+		:type player: str
+		:returns: if adding player was successful
+		:rtype: bool
+		'''
+		newPlayer = Player(player)
 		if len(self.players.keys()) < self.battlefield_size and not self.players.has_key(player):
-			self.players[player] = Battlefield()
+			self.players[player] = newPlayer
 			return True
 		else:
 			return False
 
 	def populatePlayersField(self, player, init=""):
-		field = self.players[player]
+		''' Init the playfield of a player, if no init arguments given can be done interacively
+		:param player: name of player
+		:type player: str
+		:param init: name of owner of the game
+		:type init: list of tuples (<str:name of ship>, <str: ship placement args>)
+		:returns: if populating playfield was successful
+		:rtype: bool
+		'''
+		field = self.players[player].getPlayfield()
 		shipTypes = Ship.getShipTypes()
 		if init == "":
 			for ship in shipTypes:
@@ -57,12 +73,25 @@ class Game:
 		return
 
 	def getPlayerState(self, player):
-		return self.players[player].toString()
+		''' returns string of players playfield for displaying
+		:param player: player's name
+		:type player: str
+		:returns: string of playfiled
+		:rtype: str
+		'''
+		return self.players[player].playfield.toString()
 
 	def attackPlayer(self, player, location):
+		'''
+		attack player
+		:param player: name of player to attack
+		:type player: str
+		:param location: tuple of coords where to attack
+		:type location: tuple (<str>, int)
+		'''
 		y, x = location
 		location = (Battlefield.y_coords.index(y), Battlefield.x_coords.index(x))
-		field = self.players[player]
+		field = self.players[player].getPlayfield()
 
 		result = field.fireAtShip(location)
 		if result == 'sunk':
@@ -70,6 +99,21 @@ class Game:
 			if len(ships) == 0:
 				result = 'end'
 		return result
+
+
+class Player:
+	def __init__(self, name):
+		'''
+		:param name:
+		:type name: str
+		'''
+		self.name = name
+		self.isAlive = True
+		self.playfield = Battlefield()
+
+	def getPlayfield(self):
+		return self.playfield
+
 
 class Battlefield:
 	x_coords = range(1, 11)
@@ -245,6 +289,13 @@ class Ship:
 
 
 if __name__ == "__main__":
+	# some tests
+	initField = [('Aircraft Carrier', 'a1 v'),
+	             ('Battleship', 'a3 v'),
+	             ('Cruiser', 'a5 v'),
+	             ('Submarine', 'a7 v'),
+	             ('Destroyer', 'a9 v')]
+
 	game = Game(2,'me')
 
 	game.addPlayer('me')
