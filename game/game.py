@@ -67,7 +67,8 @@ class Game:
 		result = field.fireAtShip(location)
 		if result == 'sunk':
 			ships = field.getAliveShips()
-			print ships
+			if len(ships) == 0:
+				result = 'end'
 		return result
 
 class Battlefield:
@@ -242,13 +243,15 @@ class Ship:
 	def __repr__(self):
 		return  self.type
 
-game = Game(2,'me')
 
-game.addPlayer('me')
-game.populatePlayersField('me', init=initField)
-print game.attackPlayer('me', ('a', 9))
-print game.attackPlayer('me', ('b', 9))
-print game.attackPlayer('me', ('a', 2))
-print game.attackPlayer('me', ('a', 1))
+if __name__ == "__main__":
+	game = Game(2,'me')
 
-print game.getPlayerState('me')
+	game.addPlayer('me')
+	game.populatePlayersField('me', init=initField)
+	print game.attackPlayer('me', ('a', 9))
+	print game.attackPlayer('me', ('b', 9))
+	print game.attackPlayer('me', ('a', 2))
+	print game.attackPlayer('me', ('a', 1))
+
+	print game.getPlayerState('me')
