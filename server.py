@@ -11,7 +11,6 @@ server_packeter = snakemq.packeter.Packeter(server_link)
 server_messaging = snakemq.messaging.Messaging(SERVER_IDENT, "", server_packeter)
 
 server_link.add_listener(("", 4000))  # listen on all interfaces and on port 4000
-server_link.add_connector(("localhost", 4001))
 
 client_idents = list()
 # add message parser

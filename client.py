@@ -6,59 +6,82 @@ import snakemq.message
 import threading
 
 import time
+import Queue
 
 class Client:
 	def __init__(self,  ident, remote_addr):
 
-		self.CLIENT_IDENT = ident
+		self.CLIENT_IDENT = "client"
 
 		self.client_link = snakemq.link.Link()
 		self.client_packeter = snakemq.packeter.Packeter(self.client_link)
 		self.client_messaging = None
 
-		self.client_link.add_connector((remote_addr, 4000))
-		self.client_link.add_connector((remote_addr, 4001))
-
-		self.client_packeter.on_packet_recv.add(self.on_packet)
-		# drop after 600 seconds if the message can't be delivered
+		self.client_link.wakeup_poll()
 
 		self.client_link.on_loop_pass.add(self.main_loop)
 
-		self.client_messaging = snakemq.messaging.Messaging(self.CLIENT_IDENT, "", self.client_packeter)
+		self.messageQueue = Queue.Queue()
+
+		self.userThread = threading.Thread(target=self.interactiveThread,
+		                                   args=(self.messageQueue,))
+		self.userThread.start()
+
+		self.client_messaging =  snakemq.messaging.Messaging('', "", self.client_packeter)
+		message = snakemq.message.Message('new user', ttl=1)
+		self.client_messaging.send_message('server', message)
 		self.client_messaging.on_message_recv.add(self.on_recv)
-
-
-
-		self.i = 0
-		self.lastTime = time.time()
-
-		message = snakemq.message.Message(b"hello" + str(self.i), ttl=600)
-		self.client_messaging.send_message("server", message)
-
+		self.client_messaging.on_disconnect.add(self.on_disconnect)
 		self.client_link.loop()
+
+	def connect(self, server):
+		self.client_link.add_connector((server, 4000))
+
+	def sendMessage(self, nickname, target, data):
+		self.client_messaging =  snakemq.messaging.Messaging(nickname, "", self.client_packeter)
+		message = snakemq.message.Message(data, ttl=1)
+		self.client_messaging.send_message(target, message)
+		self.client_messaging.on_message_recv.add(self.on_recv)
+		self.client_messaging.on_disconnect.add(self.on_disconnect)
+
+	def on_disconnect(self, conn_id, ident):
+		self.messageQueue.put('disconnect:'+ident)
+		print "disconnect", conn_id, ident
+
+	def on_error(self, conn_id, error):
+		print "error ", error , conn_id
 
 	# handle messages recieved
 	def on_recv(self, conn_id, ident, message):
+	    self.messageQueue.put(conn_id+ident+message.data)
 	    print "recieved message from : ",ident, message.data, conn_id
 
-	def on_sent(self, conn_id, ident, message_uuid):
-		print "sendt message to : ", ident, message_uuid, conn_id
-
-	# handle setting up unique idents because snakeMQ does not support duplicate idents
-	def on_packet(self, conn_id, packet):
-		if "ASSIGN ID:" in packet:
-			self.CLIENT_IDENT = packet.split(":")[1]
-			print "new ident: ", self.CLIENT_IDENT
-			self.client_messaging = snakemq.messaging.Messaging(self.CLIENT_IDENT, "", self.client_packeter)
-			self.client_messaging.on_message_recv.add(self.on_recv)
-
-
 	def main_loop(self):
-		if self.client_messaging is not None and time.time()-self.lastTime > 1.0:
-			print "sending mess ", self.i
-			message = snakemq.message.Message(b"hello" + str(self.i), ttl=600)
-			self.client_messaging.send_message("server", message)
-			self.i += 1
-			self.lastTime = time.time()
+		pass
+
+	def interactiveThread(self, messageQueue):
+		state = 'disconnect'
+		while True:
+			if state == 'disconnect':
+				addr = raw_input("enter address\n:>")
+				self.connect(addr)
+				while True:
+					nickname = raw_input("enter nickname\n:>")
+					if nickname == '':
+						break
+					#self.sendMessage(nickname, 'server', 'add new player:'+nickname)
+					result = messageQueue.get()
+					print result
+					if 'disconnect' not in result:
+						print 'connected to ',addr, ' as ', nickname
+						state = 'listen'
+						break
+			elif state == 'listen':
+				print "getting game announce"
+				games = messageQueue.get()
+				raw_input('server announce :%s\n enter to refresh' % games)
+				pass
+			elif state == 'game':
+				pass
 
 client = Client('client', 'localhost')
