@@ -53,7 +53,7 @@ class Game:
 						if field.addShip(name, (y, int(x)), rot):
 							break
 						print "illegal ship pos"
-					except Exception,e :
+					except Exception, e:
 						print "wrong params enter <a-j><1-10>,<horizontal-vertical>", e
 			return True
 		else:
@@ -61,13 +61,12 @@ class Game:
 				ship, coords = param
 				try:
 					y = coords[:1]
-					x, rot =coords[1:].split(" ")
+					x, rot = coords[1:].split(" ")
 					if not field.addShip(ship, (y, int(x)), rot):
 						return False
 				except Exception, e:
 					print "wrong params enter <a-j><1-10>,<horizontal-vertical>", e
 					return False
-
 
 		print field.toString()
 		return
@@ -100,6 +99,32 @@ class Game:
 				result = 'end'
 		return result
 
+	def getGameState(self, requestMaker):
+		'''
+		Assemble different players playfield into one printout mask ship locations for all ships others than the
+		selected players ship
+		:param player: name of player making request
+		:type player: str
+		:return:
+		'''
+		# create empty list of strings
+		gamestate = [''] * 13
+		for player in self.players.keys():
+			lines = self.players[player].getPlayfield().toString()[:-1]
+			# hide ships from all players other than own
+			if player != requestMaker:
+				lines = lines.replace(u'\u25C9', u'\u2610')
+			lines = lines.split('\n')
+			for i in range(len(lines)):
+				gamestate[i + 1] += lines[i] + '|\t'
+			rowLen = len(gamestate[1].expandtabs(4))
+			tags = gamestate[0] + 'Player : ' + player
+			taglen = len((tags))
+			gamestate[0] += 'Player : ' + player + ' ' * ((rowLen - taglen) - 4) + '|'
+		gamestate[0] += '\n'
+		gamestate[-1] = '\n'+Battlefield.getLegend()
+		return reduce(lambda x, y: x + y + '\n', gamestate)
+
 
 class Player:
 	def __init__(self, name):
@@ -111,6 +136,7 @@ class Player:
 		self.isAlive = True
 		self.playfield = Battlefield()
 
+
 	def getPlayfield(self):
 		return self.playfield
 
@@ -119,6 +145,12 @@ class Battlefield:
 	x_coords = range(1, 11)
 	y_coords = ['a', 'b', 'c', 'd', 'e',
 	            'f', 'g', 'h', 'i', 'j']
+
+	legend = {'none' : u'\u2610',
+	          'water': u'\u2612',
+	          'hit'  : u'\u2b14',
+	          'ship' : u'\u25C9',
+	          'sunk' : u'\u271d'}
 
 	def __init__(self):
 		self.battlefield_complete = False
@@ -142,8 +174,8 @@ class Battlefield:
 				# check if ship location legal
 				for coord in location:
 					y, x = coord
-					for y_offset in range(-1,2):
-						for x_offset in range(-1,2):
+					for y_offset in range(-1, 2):
+						for x_offset in range(-1, 2):
 							try:
 								cell = self.battlefield[y + y_offset][x + x_offset]
 								if cell != 'none':
@@ -172,16 +204,7 @@ class Battlefield:
 			string += str(self.y_coords[y]) + '\t'
 			for x in range(len(self.x_coords)):
 				cell = self.battlefield[y][x]
-				if cell == 'none':
-					string +=u'\u2610'
-				elif cell == 'water':
-					string +=u'\u2612'
-				elif cell == 'hit':
-					string +=u'\u2b14'
-				elif cell == 'ship':
-					string += u'\u25C9'
-				elif cell == 'sunk':
-					string += u'\u271d'
+				string+= self.legend[cell]
 				string += '\t'
 			string += '\n'
 		return string
@@ -217,13 +240,20 @@ class Battlefield:
 				alive_ships.append(ship)
 		return alive_ships
 
+	@classmethod
+	def getLegend(self):
+		returnString = "Legend :\n"
+		for key, value in self.legend.iteritems():
+			returnString+= value+' : '+key+'\n'
+		return returnString.replace('none', 'fog of war')
+
 
 class Ship:
-	shipTypes = {'Aircraft Carrier' : 5,
-	             'Battleship'       : 4,
-	             'Submarine'        : 3,
-	             'Cruiser'          : 3,
-	             'Destroyer'        : 2}
+	shipTypes = {'Aircraft Carrier': 5,
+	             'Battleship'      : 4,
+	             'Submarine'       : 3,
+	             'Cruiser'         : 3,
+	             'Destroyer'       : 2}
 
 	def __init__(self, type, location, rotation='h'):
 		self.type = type
@@ -239,8 +269,8 @@ class Ship:
 		yHit, xHit = locationHit
 		yLoc, xLoc = self.location
 		if self.rotation == 'h':
-			if (yHit == yLoc) and (xLoc <= xHit <= xLoc+self.length):
-				self.hit_indices[yHit-yLoc] = 1
+			if (yHit == yLoc) and (xLoc <= xHit <= xLoc + self.length):
+				self.hit_indices[yHit - yLoc] = 1
 				if self.isSunk():
 					return 'sunk'
 				else:
@@ -248,8 +278,8 @@ class Ship:
 			else:
 				return 'miss'
 		else:
-			if (xHit == xLoc) and (yLoc <= yHit <= yLoc+self.length):
-				self.hit_indices[yHit-yLoc] = 1
+			if (xHit == xLoc) and (yLoc <= yHit <= yLoc + self.length):
+				self.hit_indices[yHit - yLoc] = 1
 				if self.isSunk():
 					return 'sunk'
 				else:
@@ -258,7 +288,7 @@ class Ship:
 				return 'miss'
 
 	def isSunk(self):
-		return sum(self.hit_indices)==len(self.hit_indices)
+		return sum(self.hit_indices) == len(self.hit_indices)
 
 	def getLocation(self):
 		yLoc, xLoc = self.location
@@ -274,7 +304,7 @@ class Ship:
 
 	@classmethod
 	def getShipTypes(self):
-		ships =sorted(self.shipTypes.items(), key=operator.itemgetter(1))
+		ships = sorted(self.shipTypes.items(), key=operator.itemgetter(1))
 		ships.reverse()
 		return ships
 
@@ -285,7 +315,7 @@ class Ship:
 		return self.type
 
 	def __repr__(self):
-		return  self.type
+		return self.type
 
 
 if __name__ == "__main__":
@@ -296,13 +326,19 @@ if __name__ == "__main__":
 	             ('Submarine', 'a7 v'),
 	             ('Destroyer', 'a9 v')]
 
-	game = Game(2,'me')
+	game = Game(3, 'me')
 
 	game.addPlayer('me')
 	game.populatePlayersField('me', init=initField)
+	game.addPlayer('him')
+	game.populatePlayersField('him', init=initField)
+
+	game.addPlayer('her')
+	game.populatePlayersField('her', init=initField)
 	print game.attackPlayer('me', ('a', 9))
 	print game.attackPlayer('me', ('b', 9))
 	print game.attackPlayer('me', ('a', 2))
 	print game.attackPlayer('me', ('a', 1))
 
 	print game.getPlayerState('me')
+	print game.getGameState('me')
