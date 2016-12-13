@@ -119,7 +119,15 @@ class Game:
 			ships = field.getAliveShips()
 			if len(ships) == 0:
 				result = 'end'
+				self.players[player].isAlive = False
 		return result
+
+	def isGameOver(self):
+		alive = 0
+		for player in self.players:
+			if self.players[player].isAlive:
+				alive+=1
+		return not alive > 1
 
 	def getGameState(self, requestMaker):
 		'''

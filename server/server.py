@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+import Queue
+
 import pika
 import time
 import threading
@@ -9,6 +11,7 @@ class GameServer:
 		self.name = name
 		self.players = list()
 		self.games = list()
+		self.communicationQueue = Queue.Queue()
 
 		connection = pika.BlockingConnection(pika.ConnectionParameters(
 				host=host))
@@ -44,6 +47,9 @@ class GameServer:
 
 	def callback(self, ch, method, properties, body):
 		key = method.routing_key
+		if key != 'announce_server':
+			print(" [x] %r:%r" % (method.routing_key, body))
+
 		if key == 'join_server.'+self.name:
 			player_name = body
 			if player_name not in self.players:
@@ -99,13 +105,24 @@ class GameServer:
 								                           routing_key='game_info.' + self.name + '.' + player,
 								                           body='new player joined')
 						return
+					elif command == 'START_GAME':
+						self.channel.basic_publish(exchange='topic_game',
+						                           routing_key='game_info.' + self.name + '.' + game_name,
+						                           body='game start')
+						gamethread = threading.Thread(target=self.gameThread,
+						                              args=(game_name, ))
+						gamethread.start()
+						return
+					elif command == 'ATTACK_PLAYER':
+						player, coords = params.split(';')
+						self.communicationQueue.put((player, coords))
+						return
 
 			self.channel.basic_publish(exchange='topic_game',
 			                           routing_key='game_info.' + self.name + '.' + player_name,
 			                           body='error')
 
-		if key != 'announce_server':
-			print(" [x] %r:%r" % (method.routing_key, body))
+
 
 	def serverAnnounce(self, interval):
 		while True:
@@ -115,6 +132,26 @@ class GameServer:
 			#print 'announce server : ', self.name
 			time.sleep(interval)
 
+	def gameThread(self, game):
+		current_game = self.games[self.games.index(game)]
+		while not current_game.isGameOver():
+			for player in current_game.players:
+				if current_game.players[player].isAlive:
+					self.channel.basic_publish(exchange='topic_game',
+					                           routing_key='game_info.' + self.name + '.' + player,
+					                           body='your turn')
+					attackedPlayer, coords = self.communicationQueue.get()
+					result = current_game.attackPlayer(attackedPlayer, (coords[:1], int(coords[1:])))
+					self.channel.basic_publish(exchange='topic_game',
+					                           routing_key='game_info.' + self.name + '.' + attackedPlayer,
+					                           body='you were attacked')
+					self.channel.basic_publish(exchange='topic_game',
+					                           routing_key='game_info.' + self.name + '.' + player,
+					                           body=result)
+				else:
+					self.channel.basic_publish(exchange='topic_game',
+					                           routing_key='game_info.' + self.name + '.' + player,
+					                           body='you are dead')
 
-name = raw_input('enter server name\n:>')
-server = GameServer(name, 'localhost')
+#name = raw_input('enter server name\n:>')
+server = GameServer('a', 'localhost')

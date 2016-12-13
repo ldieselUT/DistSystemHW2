@@ -65,8 +65,12 @@ class GameClient:
 		elif key == 'game_info.' + self.connected_server + '.' + self.player_name:
 			data = body
 			self.communicationQueue.put(data)
+		elif key == 'game_info.' + self.connected_server + '.' + self.game_name:
+			data = body
+			self.communicationQueue.put(data)
 		if key != 'announce_server':
-			print(" [x] %r:%r" % (method.routing_key, body))
+			#print(" [x] %r:%r" % (method.routing_key, body))
+			pass
 
 	def connectToServer(self, server, player_name):
 		self.channel.basic_publish(exchange='topic_game',
@@ -103,6 +107,12 @@ class GameClient:
 		self.channel.basic_publish(exchange='topic_game',
 		                           routing_key='game_command.' + self.connected_server + '.' + self.game_name,
 		                           body='' + ':' + 'START_GAME' + ':' + self.player_name)
+		return self.communicationQueue.get()
+
+	def attackPlayer(self, player, coords):
+		self.channel.basic_publish(exchange='topic_game',
+		                           routing_key='game_command.' + self.connected_server + '.' + self.game_name,
+		                           body=player+';'+coords + ':' + 'ATTACK_PLAYER' + ':' + self.player_name)
 		return self.communicationQueue.get()
 
 	def mainLoop(self):
@@ -157,13 +167,30 @@ class GameClient:
 					state = 'in_game'
 				else:
 					print 'waiting for owner to start'
-					while self.waitForPlayer() != 'game start':
-						print 'new player joined'
+					while True:
+						result = self.waitForPlayer()
+						if result == 'game start':
+							break
+						print 'new player joined', result
 						print self.getPlayField()
 					state = 'in_game'
 			elif state == 'in_game':
+				while True:
+					print 'game started'
+					print self.getPlayField()
+					while True:
+						while self.communicationQueue.get() != 'your turn':
+							pass
+						print self.getPlayField()
+						user = raw_input('Enter player to attack [player_name;coords]\n:>')
+						try:
+							player, coords = user.split(';')
+							int(coords[1:])
+							print self.attackPlayer(player, coords)
+							break
+						except Exception,e:
+							print 'input error'
 
-				raw_input('TODO: make game happen here')
 			else:
 				state = 'default'
 
