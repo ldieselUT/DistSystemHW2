@@ -1,87 +1,258 @@
-import snakemq.link
-import snakemq.packeter
-import snakemq.messaging
-import snakemq.message
+#!/usr/bin/env python
+import Queue
 
+import pika
 import threading
 
 import time
-import Queue
+
 
 class Client:
-	def __init__(self,  ident, remote_addr):
+	def __init__(self, host):
+		# set up globals
+		self.games = 'waiting for sever'
+		self.name = ''
 
-		self.CLIENT_IDENT = "client"
+		connection = pika.BlockingConnection(pika.ConnectionParameters(
+		        host=host))
+		self.channel = connection.channel()
+		# set up game announce listener
+		self.channel.exchange_declare(exchange='game announce',
+		                         type='fanout')
 
-		self.client_link = snakemq.link.Link()
-		self.client_packeter = snakemq.packeter.Packeter(self.client_link)
-		self.client_messaging = None
+		result = self.channel.queue_declare(exclusive=True)
+		queue_name = result.method.queue
 
-		self.client_link.wakeup_poll()
+		self.channel.queue_bind(exchange='game announce',
+								queue=queue_name)
 
-		self.client_link.on_loop_pass.add(self.main_loop)
+		self.channel.basic_consume(self.serverAnnounceConsumer,
+		                           queue=queue_name,
+		                           no_ack=True)
 
-		self.messageQueue = Queue.Queue()
+		# set up communication to server
+		self.channel.exchange_declare(exchange='client communication',
+		                         type='direct')
 
-		self.userThread = threading.Thread(target=self.interactiveThread,
-		                                   args=(self.messageQueue,))
-		self.userThread.start()
+		# Set up main interactive thread
+		self.interactiveThread = threading.Thread(target=self.mainLoop)
+		self.interactiveThread.start()
 
-		self.client_messaging =  snakemq.messaging.Messaging('', "", self.client_packeter)
-		message = snakemq.message.Message('new user', ttl=1)
-		self.client_messaging.send_message('server', message)
-		self.client_messaging.on_message_recv.add(self.on_recv)
-		self.client_messaging.on_disconnect.add(self.on_disconnect)
-		self.client_link.loop()
+		self.channel.start_consuming()
 
-	def connect(self, server):
-		self.client_link.add_connector((server, 4000))
+	def serverAnnounceConsumer(self,ch, method, properties, body):
+		if method.exchange == 'game announce':
+			if 'no games' not in body:
+				try:
+					self.games = body.split(';')
+				except Exception, e:
+					print 'error parsing games: ', e
+					print ch
+					print method
+					print properties
+					print body
+					print '%r' % body
+			else:
+				self.games = body
 
-	def sendMessage(self, nickname, target, data):
-		self.client_messaging =  snakemq.messaging.Messaging(nickname, "", self.client_packeter)
-		message = snakemq.message.Message(data, ttl=1)
-		self.client_messaging.send_message(target, message)
-		self.client_messaging.on_message_recv.add(self.on_recv)
-		self.client_messaging.on_disconnect.add(self.on_disconnect)
+	def addName(self, name):
+		self.channel.basic_publish(exchange='client communication',
+		                           routing_key='ADD NAME',
+		                           body=name)
 
-	def on_disconnect(self, conn_id, ident):
-		self.messageQueue.put('disconnect:'+ident)
-		print "disconnect", conn_id, ident
+	def addGame(self, game):
+		self.channel.basic_publish(exchange='client communication',
+		                           routing_key='ADD GAME',
+		                           body=game)
 
-	def on_error(self, conn_id, error):
-		print "error ", error , conn_id
-
-	# handle messages recieved
-	def on_recv(self, conn_id, ident, message):
-	    self.messageQueue.put(conn_id+ident+message.data)
-	    print "recieved message from : ",ident, message.data, conn_id
-
-	def main_loop(self):
-		pass
-
-	def interactiveThread(self, messageQueue):
-		state = 'disconnect'
+	def mainLoop(self):
+		state = 'default'
 		while True:
-			if state == 'disconnect':
-				addr = raw_input("enter address\n:>")
-				self.connect(addr)
-				while True:
-					nickname = raw_input("enter nickname\n:>")
-					if nickname == '':
-						break
-					#self.sendMessage(nickname, 'server', 'add new player:'+nickname)
-					result = messageQueue.get()
-					print result
-					if 'disconnect' not in result:
-						print 'connected to ',addr, ' as ', nickname
-						state = 'listen'
-						break
-			elif state == 'listen':
-				print "getting game announce"
-				games = messageQueue.get()
-				raw_input('server announce :%s\n enter to refresh' % games)
-				pass
+			if state == 'default':
+				print 'current games: \n', self.games
+				user = raw_input('\npress ENTER to refresh or type game name to join (entering a new name starts a new game)\n:>')
+				if user != '':
+					if not user in self.games:
+						self.addGame(user)
+						state = 'game'
 			elif state == 'game':
 				pass
+			else:
+				state = 'default'
 
-client = Client('client', 'localhost')
+
+# class GameClient:
+# 	routing_keys = ['ADD PLAYER',
+# 	                'NEW GAME',
+# 	                'JOIN GAME']
+# 	def __init__(self, host):
+# 		self.serversQueue = Queue.Queue()
+# 		self.serversQueue.put( dict() )
+# 		self.channel = self.initConnection(host)
+#
+# 		# Set up main interactive thread
+# 		self.interactiveThread = threading.Thread(target=self.mainLoop)
+# 		self.interactiveThread.start()
+#
+# 		self.channel.start_consuming()
+# 		pass
+#
+# 	def initConnection(self, host):
+# 		connection = pika.BlockingConnection(pika.ConnectionParameters(
+# 				host=host))
+# 		channel = connection.channel()
+#
+# 		# check if server announce exchange exists
+# 		channel.exchange_declare(exchange='server announce', type='fanout', passive=True)
+#
+# 		# set up a queue to listen to server announces
+# 		result = channel.queue_declare(exclusive=True)
+# 		servers_queue = result.method.queue
+#
+# 		channel.queue_bind(exchange='server announce',
+# 								queue=servers_queue)
+#
+# 		channel.basic_consume(self.serverAnnounceConsumer,
+# 		                           queue=servers_queue,
+# 		                           no_ack=True)
+# 		return channel
+#
+# 	def serverAnnounceConsumer(self, ch, method, properties, body):
+# 		servers = self.serversQueue.get()
+# 		if method.exchange == 'server announce':
+# 			if body not in servers:
+# 				servers[body] = (time.time())
+# 		for server in servers.keys():
+# 			if time.time() - servers[server] > 10:
+# 				servers.pop(server, None)
+# 		self.serversQueue.put(servers)
+# 		# remove server form list if server has not responded in 10s
+#
+#
+# 	def mainLoop(self):
+# 		state = 'default'
+# 		while True:
+# 			if state == 'default':
+# 				servers = self.serversQueue.get()
+# 				keys = servers.keys()
+# 				self.serversQueue.put(servers)
+# 				print 'current servers: \n', keys
+# 				user = raw_input('\npress ENTER to refresh or type game name to join (entering a new name starts a new game)\n:>')
+# 				if user != '':
+# 					if not user in self.games:
+# 						self.addGame(user)
+# 						state = 'game'
+# 			elif state == 'game':
+# 				pass
+# 			else:
+# 				state = 'default'
+#
+# 	def connectToServer(self, server):
+# 		try:
+# 			self.channel.exchange_declare(exchange=server,
+# 			                              type='direct', passive=True)
+# 			result = self.channel.queue_declare(exclusive=True)
+# 			servers_queue = result.method.queue
+#
+# 			self.channel.queue_bind(exchange=server,
+# 			                   queue=servers_queue)
+#
+# 			self.channel.queue_bind(exchange=server,
+# 			                        queue=servers_queue,
+# 			                        routing_key=key)
+#
+#
+#
+# 		except Exception, e:
+# 			return e
+
+class GameClient:
+	def __init__(self, host):
+		self.servers = list()
+		self.connected_server = ''
+		self.player_name = ''
+		self.game_name = ''
+
+		self.communicationQueue = Queue.Queue()
+
+		connection = pika.BlockingConnection(pika.ConnectionParameters(
+				host=host))
+		self.channel = connection.channel()
+
+		self.channel.exchange_declare(exchange='topic_',
+		                         type='topic')
+
+		result = self.channel.queue_declare(exclusive=True)
+		topic_queue = result.method.queue
+
+		self.channel.queue_bind(exchange='topic_game',
+		                   queue=topic_queue,
+		                   routing_key='*')
+
+		self.channel.basic_consume(self.callback,
+		                      queue=topic_queue,
+		                      no_ack=True)
+
+		self.interactiveThread = threading.Thread(target=self.mainLoop)
+		self.interactiveThread.start()
+
+		self.channel.start_consuming()
+
+	# using single callback to handle all topics to avoid spaghetti code
+	def callback(self, ch, method, properties, body):
+		key = method.routing_key
+		if key == 'announce_server':
+			server_name = body
+			if server_name not in self.servers:
+				self.servers.append(server_name)
+		elif key == 'accept_connection.'+self.player_name:
+			server_name = body
+			self.communicationQueue.put(server_name)
+		elif key == 'reject_connection.'+self.player_name:
+			self.communicationQueue.put(None)
+		# handle game info meant for player
+		elif key == 'game_info.' + self.connected_server + '.' + self.player_name:
+			data = body
+
+		#print(" [x] %r:%r" % (method.routing_key, body))
+
+	def connectToServer(self, server, player_name):
+		self.channel.basic_publish(exchange='topic_game',
+		                           routing_key='join_server.'+server,
+		                           body=player_name)
+		return self.communicationQueue.get()
+
+	def enterGame(self, game_name):
+		self.channel.basic_publish(exchange='topic_game',
+		                           routing_key='join_game.' + self.connected_server,
+		                           body=game_name)
+		return self.communicationQueue.get()
+
+	def mainLoop(self):
+		state = 'default'
+		while True:
+			if state == 'default':
+				print 'current servers: \n', self.servers
+				user = raw_input('ENTER to refresh [server_name:player_name to connect]\n:>')
+				if user != '':
+					try:
+						server_name, player_name = user.split(':')
+						result = self.connectToServer(server_name, player_name)
+						if result is not None:
+							state = 'connected'
+					except Exception:
+						print 'input error'
+			elif state == 'connected':
+				print 'Connected to server : ', self.connected_server
+				user = raw_input('ENTER game name to enter [if game does not exist a new game will be created]\n:>')
+				state == 'in_game'
+				pass
+			elif state == 'in_game':
+
+			else:
+				state = 'default'
+
+
+
+
+client = GameClient('localhost')

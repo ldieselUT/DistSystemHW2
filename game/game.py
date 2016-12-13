@@ -2,28 +2,23 @@ import operator
 
 
 class Game:
-	def __init__(self, battlefield_size, owner):
-		''' Init Game before game can begin all players need to fill out their playfields
-		:param battlefield_size: number of playfields the game has
-		:type battlefield_size: int
-		:param owner: name of owner of the game
-		:type owner: str
-		'''
-		self.battlefield_size = battlefield_size
-		self.owner = Player(owner)
+	def __init__(self, game_name):
+		""" Init Game before game can begin all players need to fill out their playfields
+		:param game_name: name of game
+		"""
+		self.game_name = game_name
 		self.players = dict()
-		self.players[self.owner.name] = self.owner
 		self.winner = None
 
 	def addPlayer(self, player):
-		''' adds player to dictionary of players in the game, players limited to size of battlefield
+		""" adds player to dictionary of players in the game, players limited to size of battlefield
 		:param player: name of player
 		:type player: str
 		:returns: if adding player was successful
 		:rtype: bool
-		'''
+		"""
 		newPlayer = Player(player)
-		if len(self.players.keys()) < self.battlefield_size and not self.players.has_key(player):
+		if not self.players.has_key(player):
 			self.players[player] = newPlayer
 			return True
 		else:
@@ -125,6 +120,8 @@ class Game:
 		gamestate[-1] = '\n'+Battlefield.getLegend()
 		return reduce(lambda x, y: x + y + '\n', gamestate)
 
+	def __repr__(self):
+		return self.game_name
 
 class Player:
 	def __init__(self, name):
