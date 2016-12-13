@@ -9,6 +9,7 @@ class Game:
 		self.game_name = game_name
 		self.players = dict()
 		self.winner = None
+		self.owner = None
 
 	def addPlayer(self, player):
 		""" adds player to dictionary of players in the game, players limited to size of battlefield
@@ -22,6 +23,32 @@ class Game:
 			self.players[player] = newPlayer
 			return True
 		else:
+			return False
+
+	def addShip(self, player, params):
+		# type: (str, str) -> bool
+		try:
+			if '|' in params:
+				for command in params.split('|'):
+					ship, coords, orientation = command.split(';')
+					y = coords[:1]
+					x = coords[1:]
+					currentPlayer = self.players[player]
+					field = currentPlayer.playfield
+					if not field.addShip(ship, (y, int(x)), orientation):
+						return False
+				return True
+			else:
+				ship, coords, orientation = params.split(';')
+				y = coords[:1]
+				x = coords[1:]
+				currentPlayer = self.players[player]
+				field = currentPlayer.playfield
+				if not field.addShip(ship, (y, int(x)), orientation):
+					return False
+				return True
+		except Exception, e:
+			print e
 			return False
 
 	def populatePlayersField(self, player, init=""):
@@ -120,8 +147,12 @@ class Game:
 		gamestate[-1] = '\n'+Battlefield.getLegend()
 		return reduce(lambda x, y: x + y + '\n', gamestate)
 
+	def __eq__(self, other):
+		return self.game_name == other
+
 	def __repr__(self):
 		return self.game_name
+
 
 class Player:
 	def __init__(self, name):
