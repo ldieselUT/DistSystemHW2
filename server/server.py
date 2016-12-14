@@ -6,7 +6,7 @@ import time
 import threading
 from game import *
 
-class GameServer:
+class GameServer_old:
 	def __init__(self, name, host='localhost'):
 		self.name = name
 		self.players = list()
@@ -16,6 +16,9 @@ class GameServer:
 		connection = pika.BlockingConnection(pika.ConnectionParameters(
 				host=host))
 		self.channel = connection.channel()
+
+		self.channel.exchange_declare(exchange='game servers',
+		                              type='fanout')
 
 		self.channel.exchange_declare(exchange='topic_game',
 		                                type='topic')
@@ -126,10 +129,10 @@ class GameServer:
 
 	def serverAnnounce(self, interval):
 		while True:
-			self.channel.basic_publish(exchange='topic_game',
-		                           routing_key='announce_server',
-		                           body=self.name)
-			#print 'announce server : ', self.name
+			self.channel.basic_publish(exchange='game servers',
+		                           routing_key='',
+		                           body='Announce server:'+self.name)
+			print 'announce server : ', self.name
 			time.sleep(interval)
 
 	def gameThread(self, game):
@@ -153,5 +156,119 @@ class GameServer:
 					                           routing_key='game_info.' + self.name + '.' + player,
 					                           body='you are dead')
 
+class GameServer:
+	def __init__(self, name, host='localhost'):
+		self.name = name
+		self.players = list()
+		self.games = list()
+		self.communicationQueue = Queue.Queue()
+
+		connection = pika.BlockingConnection(pika.ConnectionParameters(
+				host=host))
+		self.channel = connection.channel()
+		""" declare sending channels """
+		self.channel.exchange_declare(exchange='game servers',
+		                              type='fanout')
+
+		self.channel.exchange_declare(exchange='join game',
+		                              type='topic')
+
+		""" declare reciving channels """
+		self.bindExchange(self.channel,             # channel
+		                  'new connections',        # exchange name
+		                  'topic',                  # type
+		                  self.name + '.*.toServer',# topic
+		                  self.newConnectionManager)# callback
+
+		self.bindExchange(self.channel,             # channel
+		                  'new games',              # exchange name
+		                  'topic',                  # type
+		                  self.name + '.toServer',  # topic
+		                  self.newGameManager)      # callback
+
+		self.bindExchange(self.channel,                     # channel
+		                  'existing games',                 # exchange name
+		                  'topic',                          # type
+		                  self.name + '.*' + '.toServer',   # topic
+		                  self.existingGameManager)                # callback
+
+
+		announceThread = threading.Thread(target=self.serverAnnounce,
+		                                  args=(1,))
+		announceThread.start()
+
+		gameAnnounceThread = threading.Thread(target=self.gameAnnounce,
+		                                  args=(1,))
+		gameAnnounceThread.start()
+
+		self.channel.start_consuming()
+
+	def existingGameManager(self, ch, method, properties, body):
+		command, params = body.split(':')
+		server, game, dir = method.routing_key.split('.')
+		if game in self.games:
+			if command == 'JOIN_GAME':
+				pass
+
+
+
+	def newConnectionManager(self, ch, method, properties, body):
+		server, player_name, server = method.routing_key.split('.')
+		if player_name not in self.players:
+			self.players.append(player_name)
+			self.channel.basic_publish(exchange='new connections',
+			                           routing_key='%s.%s.%s' % (self.name, player_name, 'toClient'),
+			                           body='accept')
+		else:
+			print self.players
+			self.channel.basic_publish(exchange='new connections',
+			                           routing_key='%s.%s.%s' % (self.name, player_name, 'toClient'),
+			                           body='deny')
+		print 'new connection: ', method.routing_key
+
+	def newGameManager(self, ch, method, properties, body):
+		key = method.routing_key
+		if key == self.name + '.toServer':
+			owner_name, game_name = body.split(':')
+			if game_name not in self.games:
+				self.games.append(Game(game_name))
+			print 'newgame', method.routing_key
+			self.channel.basic_publish(exchange='join game',
+			                           routing_key='%s.%s' % (self.name, owner_name),
+			                           body='owner')
+
+	def bindExchange(self, channel, exchange, type, routing_key, callback):
+		channel.exchange_declare(exchange=exchange, type=type)
+		result = channel.queue_declare(exclusive=True)
+		new_queue = result.method.queue
+
+		channel.queue_bind(exchange=exchange,
+		                   queue=new_queue,
+		                   routing_key=routing_key)
+
+		channel.basic_consume(callback,
+		                      queue=new_queue,
+		                      no_ack=True)
+
+
+	def serverAnnounce(self, interval):
+		while True:
+			self.channel.basic_publish(exchange='game servers',
+		                           routing_key='',
+		                           body='Announce server:'+self.name)
+			#print 'announce server : ', self.name
+			time.sleep(interval)
+
+	def gameAnnounce(self, interval):
+		while True:
+			if len(self.games):
+				games = ''
+				for game in self.games:
+					games += game.game_name+':'
+				self.channel.basic_publish(exchange='new games',
+			                           routing_key=self.name,
+			                           body=games[:-1])
+				#print 'announce server : ', self.name
+				time.sleep(interval)
 #name = raw_input('enter server name\n:>')
-server = GameServer('a', 'localhost')
+server = GameServer('kalle\'s server' , 'localhost')
