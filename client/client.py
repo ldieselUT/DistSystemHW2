@@ -205,14 +205,66 @@ class GameClientGui(QtGui.QMainWindow, gui.Ui_Game):
 	y_coords = ['a', 'b', 'c', 'd', 'e',
 	            'f', 'g', 'h', 'i', 'j']
 
-	def __init__(self, parent=None):
+	def __init__(self, host, server_name ,game_name, player_name , parent=None):
 		super(GameClientGui, self).__init__(parent)
 		self.setupUi(self)
+
+		# globals
+		self.game_name = game_name
+		self.player_name = player_name
+		self.server_name = server_name
 
 		# set up comboboxes
 		self.x_coordsComboBox.addItems(map(str, self.x_coords))
 		self.y_coordsComboBox.addItems(self.y_coords)
 
+		self.textEdit.setReadOnly(True)
+
+		self.channel = self.initConnection(host, server_name, game_name, player_name)
+
+
+	def initConnection(self, host, server_name, game_name, player_name):
+		connection = pika.BlockingConnection(pika.ConnectionParameters(
+				host=host))
+		channel = connection.channel()
+
+		""" set up listening channels"""
+		# listen to game state
+		self.bindExchange(channel,
+		                  'running games',
+		                  'topic',
+		                  '%s.%s.*' % (server_name, game_name),
+		                  self.gameStateManager)
+
+		return channel
+
+	def gameStateManager(self, ch, method, properties, body):
+		server, game, target = method.routing_key.split('.')
+		if target == 'all':
+			if player == 'not ready':
+				self.placeShips()
+			pass
+		elif target == self.player_name:
+			pass
+
+	def placeShips(self):
+		try:
+			while not True:
+				text, result = QtGui.QInputDialog.getText(
+						self,
+						'Place ships',
+						'enter name',
+						text='Aircraft Carrier;a1;v\nBattleship;a3;v\nCruiser;a5;v\nSubmarine;a7;v\nDestroyer;a9;v')
+				if result:
+					key= '%s.%s' % ( self.connectedServer, 'toServer')
+					self.publishMessage('new games',
+					                    key,
+					                    str(text)+':'+self.playerName)
+					print 'sending game ', text, 'to ',key
+					self.gameName = str(text)
+		except Exception, e:
+			print e
+			return
 
 class ServerBrowserGui(QtGui.QMainWindow, gui.Ui_Server_browser):
 	x_coords = range(1, 11)
@@ -237,8 +289,6 @@ class ServerBrowserGui(QtGui.QMainWindow, gui.Ui_Server_browser):
 		self.createGameButton.clicked.connect(self.createGame)
 		self.joinGameButton.clicked.connect(self.joinGame)
 
-		self.textEdit.setReadOnly(True)
-
 		#set up signals
 		self.connect(self, gui.QtCore.SIGNAL('updateStatus'),
 		             self.updateStatus)
@@ -247,25 +297,23 @@ class ServerBrowserGui(QtGui.QMainWindow, gui.Ui_Server_browser):
 		             self.startGame)
 
 	def startGame(self, args):
+		print 'starting game', args
 		gameWindow = GameClientGui(self).show()
 		self.hide()
 
 	def joinGame(self):
-
-		"""
 		try:
-			game = str(self.gamesList.selectedItems()[0].text())
+			game = self.gamesList.selectedItems()[0].text()
+			key = '%s.%s' % (self.connectedServer, 'toServer')
+			print game
 			if game:
-				text, result = QtGui.QInputDialog.getText(self, 'Connecting to '+game, 'enter name')
-				if result:
-					self.publishMessage('new connections',
-					                    '%s.%s.%s' % (server, text, 'toServer'),
-					                    'new connection')
-					print str(text)
-		except:
+				self.publishMessage('new games',
+				                    key,
+				                    str(game)+':'+ self.playerName)
+				self.gameName = str(game)
+		except Exception,e:
+			print 'Exceptin:', e
 			return
-		"""
-		pass
 
 	def createGame(self):
 		try:

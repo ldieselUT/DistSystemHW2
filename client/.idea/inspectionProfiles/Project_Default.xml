@@ -4,10 +4,8 @@
     <inspection_tool class="PyPep8Inspection" enabled="true" level="WEAK WARNING" enabled_by_default="true">
       <option name="ignoredErrors">
         <list>
-          <option value="W191" />
           <option value="E101" />
-          <option value="E265" />
-          <option value="E201" />
+          <option value="E266" />
         </list>
       </option>
     </inspection_tool>
@@ -15,7 +13,6 @@
       <option name="ignoredErrors">
         <list>
           <option value="N802" />
-          <option value="N806" />
         </list>
       </option>
     </inspection_tool>

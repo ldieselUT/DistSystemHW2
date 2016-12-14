@@ -11,6 +11,8 @@ class Game:
 		self.winner = None
 		self.owner = None
 
+		self.gameflow = 0
+
 	def addPlayer(self, player):
 		""" adds player to dictionary of players in the game, players limited to size of battlefield
 		:param player: name of player
@@ -125,9 +127,9 @@ class Game:
 	def isGameOver(self):
 		alive = 0
 		for player in self.players:
-			if self.players[player].isAlive:
-				alive+=1
-		return not alive > 1
+			if self.players[player].isAlive():
+				alive += 1
+		return alive == 0
 
 	def getGameState(self, requestMaker):
 		'''
@@ -169,13 +171,16 @@ class Player:
 		:type name: str
 		'''
 		self.name = name
-		self.isAlive = True
 		self.playfield = Battlefield()
-
 
 	def getPlayfield(self):
 		return self.playfield
 
+	def isReady(self):
+		return len(self.getPlayfield().ships) == 5
+
+	def isAlive(self):
+		return self.getPlayfield().getAliveShips() > 0
 
 class Battlefield:
 	x_coords = range(1, 11)

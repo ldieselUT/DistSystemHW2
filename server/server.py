@@ -187,9 +187,9 @@ class GameServer:
 		                  self.newGameManager)      # callback
 
 		self.bindExchange(self.channel,                     # channel
-		                  'existing games',                 # exchange name
+		                  'running games',                 # exchange name
 		                  'topic',                          # type
-		                  self.name + '.*' + '.toServer',   # topic
+		                  self.name + '.*' + '.toServer',   # topic <server>.<game>.<direction>
 		                  self.existingGameManager)                # callback
 
 
@@ -209,8 +209,6 @@ class GameServer:
 		if game in self.games:
 			if command == 'JOIN_GAME':
 				pass
-
-
 
 	def newConnectionManager(self, ch, method, properties, body):
 		server, player_name, server = method.routing_key.split('.')
@@ -232,10 +230,17 @@ class GameServer:
 			owner_name, game_name = body.split(':')
 			if game_name not in self.games:
 				self.games.append(Game(game_name))
-			print 'newgame', method.routing_key
-			self.channel.basic_publish(exchange='join game',
-			                           routing_key='%s.%s' % (self.name, owner_name),
-			                           body='owner')
+				print 'newgame', method.routing_key
+				self.channel.basic_publish(exchange='join game',
+				                           routing_key='%s.%s' % (self.name, owner_name),
+				                           body='owner')
+				game_thread = threading.Thread(target=self.gameThread,
+				                               args=(game_name,))
+				game_thread.start()
+			else:
+				self.channel.basic_publish(exchange='join game',
+				                           routing_key='%s.%s' % (self.name, owner_name),
+				                           body='player')
 
 	def bindExchange(self, channel, exchange, type, routing_key, callback):
 		channel.exchange_declare(exchange=exchange, type=type)
@@ -249,7 +254,6 @@ class GameServer:
 		channel.basic_consume(callback,
 		                      queue=new_queue,
 		                      no_ack=True)
-
 
 	def serverAnnounce(self, interval):
 		while True:
@@ -270,5 +274,17 @@ class GameServer:
 			                           body=games[:-1])
 				#print 'announce server : ', self.name
 				time.sleep(interval)
+
+	def gameThread(self, game):
+		while True:
+			key = '%s.%s.%s' % (self.name, game, 'all')
+			gamestate = ''
+
+			for self.games[game]
+			gamestate = .
+			self.channel.basic_publish(exchange='running games',
+			                           routing_key=key,
+			                           body=gamestate)
+			time.sleep(0.5)
 #name = raw_input('enter server name\n:>')
 server = GameServer('kalle\'s server' , 'localhost')
