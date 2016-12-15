@@ -177,9 +177,11 @@ class GameServer:
 					if game.gameflow is None:
 						games += game.game_name+'<waiting for players>:'
 					elif game.isGameOver():
-						games += game.game_name + '<finished>:'
+						pass
+						#games += game.game_name + '<finished>:'
 					else:
-						games += game.game_name + '<in progress>:'
+						pass
+						#games += game.game_name + '<in progress>:'
 				self.channel.basic_publish(exchange='new games',
 			                           routing_key=self.name,
 			                           body=games[:-1])

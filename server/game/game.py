@@ -110,7 +110,7 @@ class Game:
 		'''
 		return self.players[player].playfield.toString()
 
-	def attackPlayer(self, playerAttacking ,playerAttacked, location):
+	def attackPlayer(self, playerAttacking, playerAttacked, location):
 		'''
 		attack player
 		:param player: name of player to attack
@@ -166,11 +166,22 @@ class Game:
 			for i in range(len(lines)):
 				gamestate[i + 1] += lines[i] + '|\t'
 			rowLen = len(gamestate[1].expandtabs(4))
-			tags = gamestate[0] + 'Player : ' + player
-			taglen = len((tags))
-			gamestate[0] += 'Player : ' + player + ' ' * ((rowLen - taglen) - 4) + '|'
+			tags = ''
+			try:
+				if self.gameflow[0].name == player:
+					tags = gamestate[0] + 'Player : <' + player + '>'
+					taglen = len((tags))
+					gamestate[0] += 'Player : >' + player + '<' + ' ' * ((rowLen - taglen) - 4) + '|'
+				else:
+					tags = gamestate[0] + 'Player : ' + player
+					taglen = len((tags))
+					gamestate[0] += 'Player : ' + player + ' ' * ((rowLen - taglen) - 4) + '|'
+			except:
+				tags = gamestate[0] + 'Player : ' + player
+				taglen = len((tags))
+				gamestate[0] += 'Player : ' + player + ' ' * ((rowLen - taglen) - 4) + '|'
 		gamestate[0] += '\n'
-		gamestate[-1] = '\n'+Battlefield.getLegend()
+		gamestate[-1] = '\n' + Battlefield.getLegend()
 		return reduce(lambda x, y: x + y + '\n', gamestate)
 
 	def __eq__(self, other):
@@ -197,6 +208,7 @@ class Player:
 
 	def isAlive(self):
 		return len(self.getPlayfield().getAliveShips()) > 0
+
 
 class Battlefield:
 	x_coords = range(1, 11)
@@ -261,7 +273,7 @@ class Battlefield:
 			string += str(self.y_coords[y]) + '\t'
 			for x in range(len(self.x_coords)):
 				cell = self.battlefield[y][x]
-				string+= self.legend[cell]
+				string += self.legend[cell]
 				string += '\t'
 			string += '\n'
 		return string
@@ -301,7 +313,7 @@ class Battlefield:
 	def getLegend(self):
 		returnString = "Legend :\n"
 		for key, value in self.legend.iteritems():
-			returnString+= value+' : '+key+'\n'
+			returnString += value + ' : ' + key + '\n'
 		return returnString.replace('none', 'fog of war')
 
 
