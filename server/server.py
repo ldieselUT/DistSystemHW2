@@ -7,6 +7,16 @@ import threading
 from game import *
 import sys
 
+"""
+The server script has 3 main threads:
+	1) main thread that handles the message receiving and sending
+	2) server announce thread that periodically announces the existance of
+		the server to all listeners
+	3) game announce thread that announces all joinable games to all listners
+
+The server can also have a 4th type of thread a game thread that is created
+for every new game and that handles all game logic
+"""
 class GameServer:
 	def __init__(self, name, host='localhost'):
 		self.name = name

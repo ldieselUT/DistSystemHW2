@@ -11,6 +11,15 @@ import time
 import gui
 import sys
 
+"""
+The game client is made up of two parts:
+	1) the server browser
+	2) game client
+The server browser is used to find games to join and is also the thread that handles
+all of the message sending and receiving.
+The game client is run on a separate thread and is only used to display the game state
+and get user input. All of the game logic and state generation is handled by the server
+"""
 
 class GameClientGui(QtGui.QMainWindow, gui.Ui_Game):
 	x_coords = range(1, 11)
@@ -140,7 +149,7 @@ class ServerBrowserGui(QtGui.QMainWindow, gui.Ui_Server_browser):
 	y_coords = ['a', 'b', 'c', 'd', 'e',
 	            'f', 'g', 'h', 'i', 'j']
 
-	def __init__(self, host,parent=None):
+	def __init__(self, parent=None, opt=None):
 		super(ServerBrowserGui, self).__init__(parent)
 		self.setupUi(self)
 
@@ -187,6 +196,16 @@ class ServerBrowserGui(QtGui.QMainWindow, gui.Ui_Server_browser):
 		self.restartGameSignal = gui.QtCore.SIGNAL('restartGame')
 		self.connect(self, self.restartGameSignal,
 		             self.restartGame)
+
+		if len(opt) == 4:
+			server, player, game = sys.argv[1:]
+			self.connectedServer = server
+			self.playerName = player
+			self.gameName = game
+			self.gameWindow.show()
+			self.hide()
+			print 'reconnect'
+			pass
 
 	def restartGame(self):
 		key = '%s.%s.toServer' % (self.connectedServer, self.gameName)
@@ -410,10 +429,10 @@ class ServerBrowserGui(QtGui.QMainWindow, gui.Ui_Server_browser):
 
 def main():
 	app = QtGui.QApplication(sys.argv)
-	form = ServerBrowserGui('localhost')
+	form = ServerBrowserGui(opt=sys.argv)
 	form.show()
 	app.exec_()
 
-
+print sys.argv
 main()
 # client = GameClient('localhost')
