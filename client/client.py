@@ -20,7 +20,6 @@ all of the message sending and receiving.
 The game client is run on a separate thread and is only used to display the game state
 and get user input. All of the game logic and state generation is handled by the server
 
-handling disconnections and reconnections is not implemented
 """
 
 class GameClientGui(QtGui.QMainWindow, gui.Ui_Game):
@@ -111,7 +110,11 @@ class GameClientGui(QtGui.QMainWindow, gui.Ui_Game):
 			for radio in self.PlayerSelectionBox.findChildren(QtGui.QRadioButton):
 				if radio.text() not in player:
 					radio.setParent(None)
-
+			if len(self.PlayerSelectionBox.findChildren(QtGui.QRadioButton))==0:
+				player.remove(self.parent().playerName)
+				for item in player:
+					layout = self.PlayerSelectionBox.layout()
+					layout.addWidget(QtGui.QRadioButton(item, self.PlayerSelectionBox))
 		else:
 			for radio in self.PlayerSelectionBox.findChildren( QtGui.QRadioButton):
 				if radio.text() == player:
@@ -198,15 +201,24 @@ class ServerBrowserGui(QtGui.QMainWindow, gui.Ui_Server_browser):
 		self.connect(self, self.restartGameSignal,
 		             self.restartGame)
 
+		self.reconnectSignal = gui.QtCore.SIGNAL('reconnect')
+		self.connect(self, self.reconnectSignal,
+		             self.reconnectGame)
+
 		if len(opt) == 4:
-			server, player, game = sys.argv[1:]
-			self.connectedServer = server
-			self.playerName = player
-			self.gameName = game
-			self.gameWindow.show()
+			self.brokerConnectButton.clicked.emit(True)
+			self.reconnectGame()
 			self.hide()
-			print 'reconnect'
-			pass
+
+	def reconnectGame(self):
+		self.initConnection()
+		server, player, game = sys.argv[1:]
+		self.connectedServer = server
+		self.playerName = player
+		self.gameName = game
+		self.gameWindow.show()
+		print 'reconnect'
+		return
 
 	def restartGame(self):
 		key = '%s.%s.toServer' % (self.connectedServer, self.gameName)
@@ -430,7 +442,7 @@ class ServerBrowserGui(QtGui.QMainWindow, gui.Ui_Server_browser):
 
 def main():
 	app = QtGui.QApplication(sys.argv)
-	form = ServerBrowserGui(opt=sys.argv)
+	form = ServerBrowserGui(None, opt=sys.argv)
 	form.show()
 	app.exec_()
 
