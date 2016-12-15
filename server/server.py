@@ -78,10 +78,28 @@ class GameServer:
 					                           routing_key='%s.%s.%s' % (self.name, currentGame.game_name, playerAttacked),
 					                           body='RESULT:'+str(result))
 			elif command == 'LEAVE_GAME':
+				# remove player from server and game
+				self.players.remove(params)
 				player = currentGame.players[params]
 				currentGame.gameflow.remove(player)
 				currentGame.players.pop(player.name)
+				# if game has no players exit game
+				if len(currentGame.players) == 0:
+					self.games.remove(currentGame)
 
+			elif command == 'RESTART_GAME' and currentGame.owner == params:
+				# init game to enable restart
+
+				for player in currentGame.players.values():
+					for coord in player.playfield.battlefield:
+						if coord == 'hit' or coord == 'sunk':
+							coord = 'ship'
+
+				currentGame.startGame()
+				game_thread = threading.Thread(target=self.gameThread,
+				                               args=(currentGame.game_name,))
+				game_thread.start()
+				pass
 
 	def newConnectionManager(self, ch, method, properties, body):
 		server, player_name, server = method.routing_key.split('.')
@@ -154,7 +172,13 @@ class GameServer:
 			if len(self.games):
 				games = ''
 				for game in self.games:
-					games += game.game_name+':'
+					# show only games not yet started
+					if game.gameflow is None:
+						games += game.game_name+'<waiting for players>:'
+					elif game.isGameOver():
+						games += game.game_name + '<finished>:'
+					else:
+						games += game.game_name + '<in progress>:'
 				self.channel.basic_publish(exchange='new games',
 			                           routing_key=self.name,
 			                           body=games[:-1])
@@ -163,9 +187,9 @@ class GameServer:
 
 	def gameThread(self, game):
 		currentGame = self.games[self.games.index(game)]
+		key_all = '%s.%s.%s' % (self.name, game, 'all')
 		# main loop for game
 		while not currentGame.isGameOver():
-			key_all = '%s.%s.%s' % (self.name, game, 'all')
 			gamestate = 'NOT_STARTED|'
 			for player in currentGame.players:
 				if currentGame.players[player].isReady():
@@ -175,7 +199,7 @@ class GameServer:
 			gamestate = gamestate[:-1]
 			#print 'gamestate', gamestate, ' key ', key_all
 			# game has not started yet
-			if currentGame.gameflow == None:
+			if currentGame.gameflow is None:
 				self.channel.basic_publish(exchange='running games',
 				                           routing_key=key_all,
 				                           body=gamestate)
@@ -194,9 +218,13 @@ class GameServer:
 					                           body=currentGame.getGameState(player.name))
 					#print 'gamestate', gamestate
 			time.sleep(0.5)
+		body = 'GAME_OVER|Game over!\nWinner : %s' % currentGame.gameflow[0].name
 		self.channel.basic_publish(exchange='running games',
 		                           routing_key=key_all,
-		                           body='GAME_OVER|Game over!\nWinner : %s' % currentGame.gameflow[0].name)
+		                           body=body)
+
+
+
 
 #name = raw_input('enter server name\n:>')
 server = GameServer('kalle\'s server' , 'localhost')

@@ -23,6 +23,7 @@ class GameClientGui(QtGui.QMainWindow, gui.Ui_Game):
 
 		# set up globals
 		self.lock = False
+		self.restart = False
 
 
 		# set up comboboxes
@@ -85,7 +86,11 @@ class GameClientGui(QtGui.QMainWindow, gui.Ui_Game):
 
 	def startGame(self):
 		parent = self.parent()
-		parent.emit(parent.beginBattleSignal)
+		if self.restart:
+			parent.emit(parent.restartGameSignal)
+		else:
+			parent.emit(parent.beginBattleSignal)
+		self.startGameButton.setDisabled(True)
 
 	def updateStatus(self, text):
 		self.textEdit.setText(text.decode('utf-8'))
@@ -145,6 +150,7 @@ class ServerBrowserGui(QtGui.QMainWindow, gui.Ui_Server_browser):
 		self.connectedServer = ''
 		self.gameName = ''
 		self.host = ''
+		self.owner = False
 
 		self.gameWindow = GameClientGui(self)
 		#queues
@@ -178,6 +184,18 @@ class ServerBrowserGui(QtGui.QMainWindow, gui.Ui_Server_browser):
 		self.connect(self, self.leaveGameSignal,
 		             self.leaveGame)
 
+		self.restartGameSignal = gui.QtCore.SIGNAL('restartGame')
+		self.connect(self, self.restartGameSignal,
+		             self.restartGame)
+
+	def restartGame(self):
+		key = '%s.%s.toServer' % (self.connectedServer, self.gameName)
+		body = 'RESTART_GAME:%s' % self.playerName
+		print 'leaving game ', body
+		self.publishMessage('running games',
+		                    key,
+		                    body)
+
 	def leaveGame(self):
 		key = '%s.%s.toServer' % (self.connectedServer, self.gameName)
 		body = 'LEAVE_GAME:%s' % self.playerName
@@ -203,6 +221,7 @@ class ServerBrowserGui(QtGui.QMainWindow, gui.Ui_Server_browser):
 	def startGame(self, args):
 		print 'starting game', args
 		if args == 'owner':
+			self.owner = True
 			self.gameWindow.startGameButton.setDisabled(False)
 		self.gameWindow.show()
 		self.hide()
@@ -210,6 +229,7 @@ class ServerBrowserGui(QtGui.QMainWindow, gui.Ui_Server_browser):
 	def joinGame(self):
 		try:
 			game = self.gamesList.selectedItems()[0].text()
+			game = game.split('<')[0]
 			key = '%s.%s' % (self.connectedServer, 'toServer')
 			print game
 			if game:
@@ -316,6 +336,7 @@ class ServerBrowserGui(QtGui.QMainWindow, gui.Ui_Server_browser):
 			except:
 				games = [body]
 			for game in games:
+
 				exists = False
 				for i in range(self.gamesList.count()):
 					# print str(self.serverListWidget.item(i).text()), newServer
@@ -370,7 +391,10 @@ class ServerBrowserGui(QtGui.QMainWindow, gui.Ui_Server_browser):
 						else:
 							self.gameWindow.emit(self.gameWindow.updatePlayersSignal, player_name)
 				elif state == 'GAME_OVER':
+					self.gameWindow.startGameButton.setEnabled(self.owner)
 					self.gameWindow.emit(self.gameWindow.updateStatusSignal, params)
+					self.gameWindow.lock = False
+					self.gameWindow.restart = True
 				elif state == 'GAME_RUNNING':
 					turn = params.split(';')[0]
 					players = params.split(';')[1:]
