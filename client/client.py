@@ -64,8 +64,12 @@ class GameClientGui(QtGui.QMainWindow, gui.Ui_Game):
 		# set up buttons
 		self.startGameButton.clicked.connect(self.startGame)
 		self.attackButton.clicked.connect(self.attack)
+		self.leaveGameButton.clicked.connect(self.leaveGame)
 
-
+	def leaveGame(self):
+		parent = self.parent()
+		parent.emit(parent.leaveGameSignal)
+		self.close()
 
 	def connectionsStatusUpdate(self, message):
 		self.connectionsStatus.showMessage(message)
@@ -87,11 +91,17 @@ class GameClientGui(QtGui.QMainWindow, gui.Ui_Game):
 		self.textEdit.setText(text.decode('utf-8'))
 
 	def updatePlayer(self, player):
-		for radio in self.PlayerSelectionBox.findChildren( QtGui.QRadioButton):
-			if radio.text() == player:
-				return
-		layout = self.PlayerSelectionBox.layout()
-		layout.addWidget(QtGui.QRadioButton(player,self.PlayerSelectionBox))
+		if isinstance(player, list):
+			for radio in self.PlayerSelectionBox.findChildren(QtGui.QRadioButton):
+				if radio.text() not in player:
+					radio.setParent(None)
+
+		else:
+			for radio in self.PlayerSelectionBox.findChildren( QtGui.QRadioButton):
+				if radio.text() == player:
+					return
+			layout = self.PlayerSelectionBox.layout()
+			layout.addWidget(QtGui.QRadioButton(player,self.PlayerSelectionBox))
 
 	def placeShips(self):
 		self.lock = True
@@ -164,7 +174,17 @@ class ServerBrowserGui(QtGui.QMainWindow, gui.Ui_Server_browser):
 		self.connect(self, self.attackPlayerSignal,
 		             self.attackPlayer)
 
+		self.leaveGameSignal = gui.QtCore.SIGNAL('leaveGame')
+		self.connect(self, self.leaveGameSignal,
+		             self.leaveGame)
 
+	def leaveGame(self):
+		key = '%s.%s.toServer' % (self.connectedServer, self.gameName)
+		body = 'LEAVE_GAME:%s' % self.playerName
+		print 'leaving game ', body
+		self.publishMessage('running games',
+		                    key,
+		                    body)
 
 	def attackPlayer(self, player, y,x):
 		key = '%s.%s.toServer' % (self.connectedServer, self.gameName)
@@ -352,7 +372,9 @@ class ServerBrowserGui(QtGui.QMainWindow, gui.Ui_Server_browser):
 				elif state == 'GAME_OVER':
 					self.gameWindow.emit(self.gameWindow.updateStatusSignal, params)
 				elif state == 'GAME_RUNNING':
-					turn = params
+					turn = params.split(';')[0]
+					players = params.split(';')[1:]
+					self.gameWindow.emit(self.gameWindow.updatePlayersSignal, players)
 					self.gameWindow.attackButton.setEnabled(turn == self.playerName)
 
 			# parse messages only meant for the connected player

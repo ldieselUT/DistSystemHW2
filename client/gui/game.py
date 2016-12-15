@@ -66,6 +66,9 @@ class Ui_Game(object):
         self.startGameButton = QtGui.QPushButton(self.groupBox)
         self.startGameButton.setObjectName(_fromUtf8("startGameButton"))
         self.horizontalLayout_2.addWidget(self.startGameButton)
+        self.leaveGameButton = QtGui.QPushButton(self.groupBox)
+        self.leaveGameButton.setObjectName(_fromUtf8("leaveGameButton"))
+        self.horizontalLayout_2.addWidget(self.leaveGameButton)
         self.verticalLayout.addWidget(self.groupBox)
         Game.setCentralWidget(self.centralWidget)
         self.connectionsStatus = QtGui.QStatusBar(Game)
@@ -81,4 +84,5 @@ class Ui_Game(object):
         self.attackButton.setText(_translate("Game", "Attack!", None))
         self.PlayerSelectionBox.setTitle(_translate("Game", "Select player to attack", None))
         self.startGameButton.setText(_translate("Game", "Start Game", None))
+        self.leaveGameButton.setText(_translate("Game", "Leave Game", None))
 

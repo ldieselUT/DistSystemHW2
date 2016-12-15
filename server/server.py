@@ -77,7 +77,10 @@ class GameServer:
 					self.channel.basic_publish(exchange='running games',
 					                           routing_key='%s.%s.%s' % (self.name, currentGame.game_name, playerAttacked),
 					                           body='RESULT:'+str(result))
-
+			elif command == 'LEAVE_GAME':
+				player = currentGame.players[params]
+				currentGame.gameflow.remove(player)
+				currentGame.players.pop(player.name)
 
 
 	def newConnectionManager(self, ch, method, properties, body):
@@ -177,7 +180,10 @@ class GameServer:
 				                           routing_key=key_all,
 				                           body=gamestate)
 			else:
-				gamestate = 'GAME_RUNNING|'+currentGame.getPlayerTurn()
+				gamestate = 'GAME_RUNNING|'+currentGame.getPlayerTurn()+';'
+				for key in currentGame.players.keys():
+					gamestate+= key+';'
+				gamestate = gamestate[:-1]
 				self.channel.basic_publish(exchange='running games',
 				                           routing_key=key_all,
 				                           body=gamestate)
@@ -190,7 +196,7 @@ class GameServer:
 			time.sleep(0.5)
 		self.channel.basic_publish(exchange='running games',
 		                           routing_key=key_all,
-		                           body='GAME_OVER|Game over!\nWinner : %s' % currentGame.gameflow[0])
+		                           body='GAME_OVER|Game over!\nWinner : %s' % currentGame.gameflow[0].name)
 
 #name = raw_input('enter server name\n:>')
 server = GameServer('kalle\'s server' , 'localhost')
