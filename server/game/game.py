@@ -11,7 +11,13 @@ class Game:
 		self.winner = None
 		self.owner = None
 
-		self.gameflow = 0
+		self.gameflow = None
+
+	def startGame(self):
+		self.gameflow = self.players.values()
+
+	def getPlayerTurn(self):
+		return self.gameflow[0].name
 
 	def addPlayer(self, player):
 		""" adds player to dictionary of players in the game, players limited to size of battlefield
@@ -104,7 +110,7 @@ class Game:
 		'''
 		return self.players[player].playfield.toString()
 
-	def attackPlayer(self, player, location):
+	def attackPlayer(self, playerAttacking ,playerAttacked, location):
 		'''
 		attack player
 		:param player: name of player to attack
@@ -112,24 +118,34 @@ class Game:
 		:param location: tuple of coords where to attack
 		:type location: tuple (<str>, int)
 		'''
-		y, x = location
-		location = (Battlefield.y_coords.index(y), Battlefield.x_coords.index(x))
-		field = self.players[player].getPlayfield()
-
-		result = field.fireAtShip(location)
-		if result == 'sunk':
-			ships = field.getAliveShips()
-			if len(ships) == 0:
-				result = 'end'
-				self.players[player].isAlive = False
-		return result
+		# check if player is allowed to make move
+		if self.gameflow[0].name == playerAttacking:
+			y, x = location
+			location = (Battlefield.y_coords.index(y), Battlefield.x_coords.index(x))
+			field = self.players[playerAttacked].getPlayfield()
+			result = field.fireAtShip(location)
+			# check if player is still alive
+			if result == 'sunk':
+				ships = field.getAliveShips()
+				if len(ships) == 0:
+					result = 'end'
+			# reorder player list to get new player, if player died remove from list
+			if result != 'end':
+				current_player = self.gameflow.pop(0)
+				self.gameflow.append(current_player)
+			else:
+				for player in self.gameflow:
+					if not player.isAlive():
+						self.gameflow.remove(player)
+			return result
+		else:
+			return False
 
 	def isGameOver(self):
-		alive = 0
-		for player in self.players:
-			if self.players[player].isAlive():
-				alive += 1
-		return alive == 0
+		if self.gameflow is not None:
+			return len(self.gameflow) <= 1
+		else:
+			return False
 
 	def getGameState(self, requestMaker):
 		'''
@@ -180,7 +196,7 @@ class Player:
 		return len(self.getPlayfield().ships) == 5
 
 	def isAlive(self):
-		return self.getPlayfield().getAliveShips() > 0
+		return len(self.getPlayfield().getAliveShips()) > 0
 
 class Battlefield:
 	x_coords = range(1, 11)
@@ -189,7 +205,7 @@ class Battlefield:
 
 	legend = {'none' : u'\u2610',
 	          'water': u'\u2612',
-	          'hit'  : u'\u2b14',
+	          'hit'  : u'\u2605',
 	          'ship' : u'\u25C9',
 	          'sunk' : u'\u271d'}
 
@@ -309,24 +325,27 @@ class Ship:
 	def hitShip(self, locationHit):
 		yHit, xHit = locationHit
 		yLoc, xLoc = self.location
-		if self.rotation == 'h':
-			if (yHit == yLoc) and (xLoc <= xHit <= xLoc + self.length):
-				self.hit_indices[yHit - yLoc] = 1
-				if self.isSunk():
-					return 'sunk'
+		try:
+			if self.rotation == 'h':
+				if (yHit == yLoc) and (xLoc <= xHit <= xLoc + self.length):
+					self.hit_indices[yHit - yLoc] = 1
+					if self.isSunk():
+						return 'sunk'
+					else:
+						return 'hit'
 				else:
-					return 'hit'
+					return 'miss'
 			else:
-				return 'miss'
-		else:
-			if (xHit == xLoc) and (yLoc <= yHit <= yLoc + self.length):
-				self.hit_indices[yHit - yLoc] = 1
-				if self.isSunk():
-					return 'sunk'
+				if (xHit == xLoc) and (yLoc <= yHit <= yLoc + self.length):
+					self.hit_indices[yHit - yLoc] = 1
+					if self.isSunk():
+						return 'sunk'
+					else:
+						return 'hit'
 				else:
-					return 'hit'
-			else:
-				return 'miss'
+					return 'miss'
+		except:
+			return 'miss'
 
 	def isSunk(self):
 		return sum(self.hit_indices) == len(self.hit_indices)

@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 import Queue
 from PyQt4 import QtCore
-
 from PyQt4 import QtGui
 
 import pika
@@ -13,265 +12,120 @@ import gui
 import sys
 
 
-# class GameClient:
-# 	def __init__(self, host):
-# 		self.servers = list()
-# 		self.connected_server = ''
-# 		self.player_name = ''
-# 		self.game_name = ''
-# 		self.isOwner = False
-#
-# 		self.communicationQueue = Queue.Queue()
-#
-# 		connection = pika.BlockingConnection(pika.ConnectionParameters(
-# 				host=host))
-# 		self.channel = connection.channel()
-#
-# 		self.channel.exchange_declare(exchange='topic_',
-# 		                              type='topic')
-#
-# 		result = self.channel.queue_declare(exclusive=True)
-# 		topic_queue = result.method.queue
-#
-# 		self.channel.queue_bind(exchange='topic_game',
-# 		                        queue=topic_queue,
-# 		                        routing_key='*')
-#
-# 		self.channel.queue_bind(exchange='topic_game',
-# 		                        queue=topic_queue,
-# 		                        routing_key='*.*')
-#
-# 		self.channel.queue_bind(exchange='topic_game',
-# 		                        queue=topic_queue,
-# 		                        routing_key='*.*.*')
-#
-# 		self.channel.basic_consume(self.callback,
-# 		                           queue=topic_queue,
-# 		                           no_ack=True)
-#
-# 		self.interactiveThread = threading.Thread(target=self.mainLoop)
-# 		self.interactiveThread.start()
-#
-# 		self.channel.start_consuming()
-#
-# 	# using single callback to handle all topics to avoid spaghetti code
-# 	def callback(self, ch, method, properties, body):
-# 		key = method.routing_key
-# 		if key == 'announce_server':
-# 			server_name = body
-# 			if server_name not in self.servers:
-# 				self.servers.append(server_name)
-# 		elif key == 'accept_connection.' + self.player_name:
-# 			server_name = body
-# 			self.connected_server = server_name
-# 			self.communicationQueue.put(server_name)
-# 		elif key == 'reject_connection.' + self.player_name:
-# 			self.communicationQueue.put(None)
-# 		# handle game info meant for player
-# 		elif key == 'game_info.' + self.connected_server + '.' + self.player_name:
-# 			data = body
-# 			self.communicationQueue.put(data)
-# 		elif key == 'game_info.' + self.connected_server + '.' + self.game_name:
-# 			data = body
-# 			self.communicationQueue.put(data)
-# 		if key != 'announce_server':
-# 			# print(" [x] %r:%r" % (method.routing_key, body))
-# 			pass
-#
-# 	def connectToServer(self, server, player_name):
-# 		self.channel.basic_publish(exchange='topic_game',
-# 		                           routing_key='join_server.' + server,
-# 		                           body=player_name)
-# 		return self.communicationQueue.get()
-#
-# 	def enterGame(self, game_name):
-# 		self.channel.basic_publish(exchange='topic_game',
-# 		                           routing_key='join_game.' + self.connected_server,
-# 		                           body=game_name + ':' + self.player_name)
-# 		return self.communicationQueue.get()
-#
-# 	def placeShip(self, params):
-# 		self.channel.basic_publish(exchange='topic_game',
-# 		                           routing_key='game_command.' + self.connected_server + '.' + self.game_name,
-# 		                           body=params + ':' + 'PLACE_SHIP' + ':' + self.player_name)
-# 		return self.communicationQueue.get()
-#
-# 	def getPlayField(self):
-# 		self.channel.basic_publish(exchange='topic_game',
-# 		                           routing_key='game_command.' + self.connected_server + '.' + self.game_name,
-# 		                           body='' + ':' + 'GET_PLAYFIELD' + ':' + self.player_name)
-# 		return self.communicationQueue.get()
-#
-# 	def waitForPlayer(self, announce=False):
-# 		if announce:
-# 			self.channel.basic_publish(exchange='topic_game',
-# 			                           routing_key='game_command.' + self.connected_server + '.' + self.game_name,
-# 			                           body='' + ':' + 'WAIT_FOR_PLAYER' + ':' + self.player_name)
-# 		return self.communicationQueue.get()
-#
-# 	def startGame(self):
-# 		self.channel.basic_publish(exchange='topic_game',
-# 		                           routing_key='game_command.' + self.connected_server + '.' + self.game_name,
-# 		                           body='' + ':' + 'START_GAME' + ':' + self.player_name)
-# 		return self.communicationQueue.get()
-#
-# 	def attackPlayer(self, player, coords):
-# 		self.channel.basic_publish(exchange='topic_game',
-# 		                           routing_key='game_command.' + self.connected_server + '.' + self.game_name,
-# 		                           body=player + ';' + coords + ':' + 'ATTACK_PLAYER' + ':' + self.player_name)
-# 		return self.communicationQueue.get()
-#
-# 	def mainLoop(self):
-# 		state = 'default'
-# 		while True:
-# 			### default state
-# 			if state == 'default':
-# 				print 'current servers: \n', self.servers
-# 				user = raw_input('ENTER to refresh [server_name:player_name to connect]\n:>')
-# 				if user != '':
-# 					try:
-# 						server_name, player_name = user.split(':')
-# 						self.player_name = player_name
-# 						result = self.connectToServer(server_name, player_name)
-# 						if result is not None:
-# 							state = 'connected'
-# 					except Exception:
-# 						print 'input error'
-# 			##############################################
-# 			elif state == 'connected':
-# 				print 'Connected to server : ', self.connected_server
-# 				user = raw_input('ENTER game name to enter [if game does not exist a new game will be created]\n:>')
-# 				result = self.enterGame(user)
-# 				if 'new game' in result:
-# 					self.isOwner = True
-# 				print result
-# 				self.game_name = result.split(':')[-1]
-# 				state = 'place_ships'
-# 				pass
-# 			elif state == 'place_ships':
-# 				ships = 0
-# 				print 'Enter location of ships',
-# 				while ships < 5:
-# 					user = raw_input('[name_of_ship;coordinates;orientation]:>')
-# 					result = self.placeShip(user)
-# 					if result == 'ship added':
-# 						if '|' in user:
-# 							ships += len(user.split('|'))
-# 						else:
-# 							ships += 1
-# 				state = 'waiting'
-# 				print self.getPlayField()
-# 			# self.waitForPlayer(announce=True)
-# 			elif state == 'waiting':
-# 				if self.isOwner:
-# 					while 'n' not in raw_input('Wait for more players? [y/n]\n:>'):
-# 						print 'waiting for players'
-# 						self.waitForPlayer(announce=True)
-# 						print 'new player joined'
-# 						print self.getPlayField()
-# 					self.startGame()
-# 					state = 'in_game'
-# 				else:
-# 					print 'waiting for owner to start'
-# 					while True:
-# 						result = self.waitForPlayer()
-# 						if result == 'game start':
-# 							break
-# 						print 'new player joined', result
-# 						print self.getPlayField()
-# 					state = 'in_game'
-# 			elif state == 'in_game':
-# 				while True:
-# 					print 'game started'
-# 					print self.getPlayField()
-# 					while True:
-# 						while self.communicationQueue.get() != 'your turn':
-# 							pass
-# 						print self.getPlayField()
-# 						user = raw_input('Enter player to attack [player_name;coords]\n:>')
-# 						try:
-# 							player, coords = user.split(';')
-# 							int(coords[1:])
-# 							print self.attackPlayer(player, coords)
-# 							break
-# 						except Exception, e:
-# 							print 'input error'
-#
-# 			else:
-# 				state = 'default'
-
 class GameClientGui(QtGui.QMainWindow, gui.Ui_Game):
 	x_coords = range(1, 11)
 	y_coords = ['a', 'b', 'c', 'd', 'e',
 	            'f', 'g', 'h', 'i', 'j']
 
-	def __init__(self, host, server_name ,game_name, player_name , parent=None):
+	def __init__(self, parent=None, role='player'):
 		super(GameClientGui, self).__init__(parent)
 		self.setupUi(self)
 
-		# globals
-		self.game_name = game_name
-		self.player_name = player_name
-		self.server_name = server_name
+		# set up globals
+		self.lock = False
+
 
 		# set up comboboxes
 		self.x_coordsComboBox.addItems(map(str, self.x_coords))
 		self.y_coordsComboBox.addItems(self.y_coords)
+		# set up gui stuff
 
+		self.startGameButton.setDisabled(role == 'player')
+
+		font = QtGui.QFont()
+		font.setFamily("Courier");
+		font.setStyleHint(QtGui.QFont.Monospace);
+		font.setFixedPitch(True);
+		font.setPointSize(10);
+
+		self.textEdit.setWordWrapMode(QtGui.QTextOption.NoWrap)
+		self.textEdit.setFont(font)
 		self.textEdit.setReadOnly(True)
+		metric = QtGui.QFontMetrics(font)
+		self.textEdit.setTabStopWidth(4 * metric.width(' '));
 
-		self.channel = self.initConnection(host, server_name, game_name, player_name)
+		# set up signals
+		self.placeShipsSignal = gui.QtCore.SIGNAL('placeShips')
+		self.connect(self, self.placeShipsSignal,
+		             self.placeShips)
+
+		self.updateStatusSignal = gui.QtCore.SIGNAL('updateStatus')
+		self.connect(self, self.updateStatusSignal,
+		             self.updateStatus)
+
+		self.updatePlayersSignal = gui.QtCore.SIGNAL('updatePlayers')
+		self.connect(self, self.updatePlayersSignal,
+		             self.updatePlayer)
+
+		self.connectionsStatusSignal = gui.QtCore.SIGNAL('connectionStatus')
+		self.connect(self, self.connectionsStatusSignal,
+		             self.connectionsStatusUpdate)
+
+		# set up buttons
+		self.startGameButton.clicked.connect(self.startGame)
+		self.attackButton.clicked.connect(self.attack)
 
 
-	def initConnection(self, host, server_name, game_name, player_name):
-		connection = pika.BlockingConnection(pika.ConnectionParameters(
-				host=host))
-		channel = connection.channel()
 
-		""" set up listening channels"""
-		# listen to game state
-		self.bindExchange(channel,
-		                  'running games',
-		                  'topic',
-		                  '%s.%s.*' % (server_name, game_name),
-		                  self.gameStateManager)
+	def connectionsStatusUpdate(self, message):
+		self.connectionsStatus.showMessage(message)
 
-		return channel
+	def attack(self):
+		for radio in self.PlayerSelectionBox.findChildren( QtGui.QRadioButton):
+			if radio.isChecked():
+				playerToAttack = radio.text()
+				x = self.x_coordsComboBox.currentText()
+				y = self.y_coordsComboBox.currentText()
+				self.parent().emit(self.parent().attackPlayerSignal, playerToAttack, y,x)
+				return
 
-	def gameStateManager(self, ch, method, properties, body):
-		server, game, target = method.routing_key.split('.')
-		if target == 'all':
-			if player == 'not ready':
-				self.placeShips()
-			pass
-		elif target == self.player_name:
-			pass
+	def startGame(self):
+		parent = self.parent()
+		parent.emit(parent.beginBattleSignal)
+
+	def updateStatus(self, text):
+		self.textEdit.setText(text.decode('utf-8'))
+
+	def updatePlayer(self, player):
+		for radio in self.PlayerSelectionBox.findChildren( QtGui.QRadioButton):
+			if radio.text() == player:
+				return
+		layout = self.PlayerSelectionBox.layout()
+		layout.addWidget(QtGui.QRadioButton(player,self.PlayerSelectionBox))
 
 	def placeShips(self):
+		self.lock = True
 		try:
-			while not True:
+			while True:
 				text, result = QtGui.QInputDialog.getText(
 						self,
 						'Place ships',
 						'enter name',
-						text='Aircraft Carrier;a1;v\nBattleship;a3;v\nCruiser;a5;v\nSubmarine;a7;v\nDestroyer;a9;v')
+						text='Aircraft Carrier;a1;v|Battleship;a3;v|Cruiser;a5;v|Submarine;a7;v|Destroyer;a9;v')
 				if result:
-					key= '%s.%s' % ( self.connectedServer, 'toServer')
-					self.publishMessage('new games',
-					                    key,
-					                    str(text)+':'+self.playerName)
-					print 'sending game ', text, 'to ',key
-					self.gameName = str(text)
+					try:
+						placement = text.split('|')
+						if len(placement) == 5:
+							parent = self.parent()
+							key = '%s.%s.toServer' % (parent.connectedServer, parent.gameName)
+							body = 'PLACE_SHIPS:'+parent.playerName+'|'+text
+							self.parent().channel.basic_publish(
+									exchange='running games',
+		                            routing_key=key,
+		                            body=str(body))
+							break
+					except:
+						pass
 		except Exception, e:
 			print e
-			return
+
 
 class ServerBrowserGui(QtGui.QMainWindow, gui.Ui_Server_browser):
 	x_coords = range(1, 11)
 	y_coords = ['a', 'b', 'c', 'd', 'e',
 	            'f', 'g', 'h', 'i', 'j']
 
-	def __init__(self, parent=None):
+	def __init__(self, host,parent=None):
 		super(ServerBrowserGui, self).__init__(parent)
 		self.setupUi(self)
 
@@ -280,6 +134,9 @@ class ServerBrowserGui(QtGui.QMainWindow, gui.Ui_Server_browser):
 		self.playerName = ''
 		self.connectedServer = ''
 		self.gameName = ''
+		self.host = ''
+
+		self.gameWindow = GameClientGui(self)
 		#queues
 
 		# button methods
@@ -296,9 +153,38 @@ class ServerBrowserGui(QtGui.QMainWindow, gui.Ui_Server_browser):
 		self.connect(self, gui.QtCore.SIGNAL('startGame'),
 		             self.startGame)
 
+		self.connect(self, gui.QtCore.SIGNAL('publish'),
+		             self.publishMessage)
+
+		self.beginBattleSignal = gui.QtCore.SIGNAL('beginBattle' )
+		self.connect(self, self.beginBattleSignal,
+		             self.beginBattle)
+
+		self.attackPlayerSignal = gui.QtCore.SIGNAL('attackPlayer')
+		self.connect(self, self.attackPlayerSignal,
+		             self.attackPlayer)
+
+
+
+	def attackPlayer(self, player, y,x):
+		key = '%s.%s.toServer' % (self.connectedServer, self.gameName)
+		body = 'ATTACK_PLAYER:%s;%s;%s;%s' % (self.playerName, player, y,x )
+		print 'attacking player ', body
+		self.publishMessage('running games',
+		                    key,
+		                    body)
+
+	def beginBattle(self):
+		key = '%s.%s.toServer' % (self.connectedServer, self.gameName)
+		self.publishMessage('running games',
+		                    key,
+		                   'BEGIN_BATTLE:' + self.playerName)
+
 	def startGame(self, args):
 		print 'starting game', args
-		gameWindow = GameClientGui(self).show()
+		if args == 'owner':
+			self.gameWindow.startGameButton.setDisabled(False)
+		self.gameWindow.show()
 		self.hide()
 
 	def joinGame(self):
@@ -318,7 +204,7 @@ class ServerBrowserGui(QtGui.QMainWindow, gui.Ui_Server_browser):
 	def createGame(self):
 		try:
 			if self.connectedServer != '':
-				text, result = QtGui.QInputDialog.getText(self, 'Creating game', 'enter name')
+				text, result = QtGui.QInputDialog.getText(self, 'Creating game', 'enter name', text='game')
 				if result:
 					key= '%s.%s' % ( self.connectedServer, 'toServer')
 					self.publishMessage('new games',
@@ -337,11 +223,12 @@ class ServerBrowserGui(QtGui.QMainWindow, gui.Ui_Server_browser):
 			server = self.serverListWidget.selectedItems()[0].text()
 			print server
 			if server:
-				text, result = QtGui.QInputDialog.getText(self, 'Connecting to '+server, 'enter name')
+				text, result = QtGui.QInputDialog.getText(self, 'Connecting to '+server, 'enter name', text='name')
 				if result:
 					self.publishMessage('new connections',
 					                    '%s.%s.%s' % (server, text, 'toServer'),
 					                    'new connection')
+					self.playerName = str(text)
 					print str(text)
 		except:
 			return
@@ -353,10 +240,10 @@ class ServerBrowserGui(QtGui.QMainWindow, gui.Ui_Server_browser):
 		threading.Thread(target=self.channel.start_consuming).start()
 
 	def initConnection(self):
-		host = str(self.hostLineEdit.text())
+		self.host = str(self.hostLineEdit.text())
 
 		connection = pika.BlockingConnection(pika.ConnectionParameters(
-				host=host))
+				host=self.host))
 		channel = connection.channel()
 
 		""" set up listening channels"""
@@ -368,16 +255,18 @@ class ServerBrowserGui(QtGui.QMainWindow, gui.Ui_Server_browser):
 		self.bindExchange(channel, 'new games', 'topic', '*', self.newGameManager)
 		# set up listener to join games
 		self.bindExchange(channel, 'join game', 'topic', '*.*', self.joinGameManager)
+		# set up gamestate listener, format <server>.<game>.<direction>
+		self.bindExchange(channel, 'running games', 'topic', '*.*.*', self.gameStateManager)
 		"""  set up sending channels"""
 		# self.channel.exchange_declare(exchange='topic_game',type='topic')
 
 		return channel
 
 	def joinGameManager(self, ch, method, properties, body):
-		server, game = method.routing_key.split('.')
+		server, player = method.routing_key.split('.')
 		print 'join',method.routing_key, body
-		if server == self.connectedServer and game == self.gameName:
-			self.emit( gui.QtCore.SIGNAL('startGame'), (server, game))
+		if server == self.connectedServer and player == self.playerName:
+			self.emit( gui.QtCore.SIGNAL('startGame'), body)
 		pass
 
 	def publishMessage(self, exchange, routing_key, body):
@@ -420,12 +309,11 @@ class ServerBrowserGui(QtGui.QMainWindow, gui.Ui_Server_browser):
 		if body == 'accept':
 			self.emit(QtCore.SIGNAL('updateStatus'),
 			          'Connected to: %s as %s' % (server, player))
-			self.playerName = player
 			self.connectedServer = server
 		else:
 			self.emit(QtCore.SIGNAL('updateStatus'),
 			          'error connecting to: %s as %s' % (server, player))
-		print server, player, direction, body
+		print 'connected to server ', server, player, direction, body
 
 	def serverManager(self, ch, method, properties, body):
 		try:
@@ -438,18 +326,45 @@ class ServerBrowserGui(QtGui.QMainWindow, gui.Ui_Server_browser):
 		except:
 			return
 
-	def ClearPlayers(self):
-		for item in self.PlayerSelectionBox.children():
-			if isinstance(item,QtGui.QRadioButton):
-				item.setParent(None)
-				#print item
-
 	def updateStatus(self, message):
 		self.connectionsStatus.showMessage(message)
 
+	def gameStateManager(self, ch, method, properties, body):
+		server, game, target = method.routing_key.split('.')
+		# listen to only own game messages
+		if server == self.connectedServer and game == self.gameName:
+			# 'all' is for status messages about game state
+			if target == 'all':
+				state, params = body.split('|')
+				if state == 'NOT_STARTED':
+					players = params.split(';')
+					for player in players:
+						player_name, status = player.split(':')
+						if self.playerName == player_name:
+							print 'player status : ', player_name, status
+							if status == 'not ready' and not self.gameWindow.lock:
+								self.gameWindow.emit(self.gameWindow.placeShipsSignal)
+							else:
+								self.gameWindow.emit(self.gameWindow.updateStatusSignal, params)
+								#self.gameWindow.lock = False
+						else:
+							self.gameWindow.emit(self.gameWindow.updatePlayersSignal, player_name)
+				elif state == 'GAME_OVER':
+					self.gameWindow.emit(self.gameWindow.updateStatusSignal, params)
+				elif state == 'GAME_RUNNING':
+					turn = params
+					self.gameWindow.attackButton.setEnabled(turn == self.playerName)
+
+			# parse messages only meant for the connected player
+			elif target == self.playerName:
+				if 'RESULT:' in body:
+					self.gameWindow.emit(self.gameWindow.connectionsStatusSignal, body)
+				else:
+					self.gameWindow.emit(self.gameWindow.updateStatusSignal, body)
+
 def main():
 	app = QtGui.QApplication(sys.argv)
-	form = ServerBrowserGui()
+	form = ServerBrowserGui('localhost')
 	form.show()
 	app.exec_()
 
