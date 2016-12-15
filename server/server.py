@@ -5,6 +5,7 @@ import pika
 import time
 import threading
 from game import *
+import sys
 
 class GameServer:
 	def __init__(self, name, host='localhost'):
@@ -226,5 +227,6 @@ class GameServer:
 
 
 
+print sys.argv
 #name = raw_input('enter server name\n:>')
-server = GameServer('kalle\'s server' , 'localhost')
+server = GameServer(sys.argv[1], sys.argv[2])
