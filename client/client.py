@@ -19,6 +19,8 @@ The server browser is used to find games to join and is also the thread that han
 all of the message sending and receiving.
 The game client is run on a separate thread and is only used to display the game state
 and get user input. All of the game logic and state generation is handled by the server
+
+handling disconnections and reconnections is not implemented
 """
 
 class GameClientGui(QtGui.QMainWindow, gui.Ui_Game):
@@ -142,7 +144,6 @@ class GameClientGui(QtGui.QMainWindow, gui.Ui_Game):
 						pass
 		except Exception, e:
 			print e
-
 
 class ServerBrowserGui(QtGui.QMainWindow, gui.Ui_Server_browser):
 	x_coords = range(1, 11)
